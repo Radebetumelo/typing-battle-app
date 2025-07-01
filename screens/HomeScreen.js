@@ -8,6 +8,7 @@ export default function HomeScreen({ navigation }) {
       <Button title="Typing Reel" onPress={() => navigation.navigate('TypingReel')} />
       <Button title="Battle Mode" onPress={() => navigation.navigate('Battle')} />
       <Button title="Profile" onPress={() => navigation.navigate('Profile')} />
+      <Button title="Battle Lobby" onPress={() => navigation.navigate('MultiplayerLobby')} />  
     </View>
   );
 }

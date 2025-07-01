@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../backend/firebase/firebaseConfig';
+
+const writeTestData = async () => {
+  try {
+    await addDoc(collection(db, 'testCollection'), {
+      test: '🔥 Hello Firebase!',
+      timestamp: Date.now()
+    });
+    console.log('Test data sent!');
+  } catch (e) {
+    console.error('Firebase write error:', e);
+  }
+};
+
+
 const prompt = "The quick brown fox jumps over the lazy dog";
 
 const KEY_ROWS = [
@@ -37,6 +53,7 @@ export default function TypingReelScreen() {
     const calculatedWpm = Math.round(words / minutes);
     setWpm(isNaN(calculatedWpm) ? 0 : calculatedWpm);
 
+    
     const promptWords = prompt.trim().split(/\s+/);
     const typedWords = typed.trim().split(/\s+/);
     let correct = 0;
@@ -57,6 +74,8 @@ export default function TypingReelScreen() {
       setTimeout(() => setLastKey(''), 150); // fade out key highlight
     }
   };
+
+ 
 
   return (
     <View style={styles.container}>
@@ -102,7 +121,7 @@ export default function TypingReelScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, justifyContent: 'center', alignItems: 'center' },
-  prompt: { fontSize: 18, marginBottom: 10, textAlign: 'center' },
+  prompt: { fontSize: 16, marginBottom: 10, textAlign: 'center' },
   input: {
     borderColor: '#aaa',
     borderWidth: 1,
@@ -134,7 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2196F3',
   },
   keyText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#000',
   },
