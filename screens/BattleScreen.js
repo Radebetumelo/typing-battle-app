@@ -1,29 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, Button } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Button, Alert } from 'react-native';
+import { listenToRoom, updatePlayerData } from '../backend/firebase/battleService';
 
-const prompt = "Battle typing mode is now active and intense!";
+export default function BattleScreen({ route }) {
+  const { roomId, playerName } = route.params;
 
-export default function BattleScreen() {
-  const [p1Text, setP1Text] = useState('');
-  const [p2Text, setP2Text] = useState('');
-  const [p1Start, setP1Start] = useState(null);
-  const [p2Start, setP2Start] = useState(null);
+  const [bothPlayersReady, setBothPlayersReady] = useState(false);
+  const [playerText, setPlayerText] = useState('');
+  const [opponentText, setOpponentText] = useState('');
+  const [startTime, setStartTime] = useState(null);
+  const [opponentName, setOpponentName] = useState('');
   const [countdown, setCountdown] = useState(3);
   const [isActive, setIsActive] = useState(false);
   const [winner, setWinner] = useState('');
-  const [stats, setStats] = useState({ p1: {}, p2: {} });
+  const [prompt, setPrompt] = useState('');
+  const [stats, setStats] = useState({ wpm: 0, accuracy: 0 });
 
-  // Countdown timer
+  // ⏱️ Countdown logic
   useEffect(() => {
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
       return () => clearTimeout(timer);
     } else {
       setIsActive(true);
     }
   }, [countdown]);
 
-  // Calculate stats
+  // 📡 Listen to room
+  useEffect(() => {
+  const unsub = listenToRoom(roomId, (roomData) => {
+    if (!prompt && roomData.prompt) setPrompt(roomData.prompt);
+
+    const players = roomData.players || {};
+    const otherPlayers = Object.keys(players).filter((n) => n !== playerName);
+    const opponent = otherPlayers[0];
+
+    setOpponentName(opponent || 'Waiting...');
+
+    // ⛔ Wait for both players
+    if (Object.keys(players).length < 2) {
+      setBothPlayersReady(false);
+      setIsActive(false);       // Stop typing
+      setCountdown(3);          // Reset countdown
+      return;
+    } else {
+      setBothPlayersReady(true);
+    }
+
+    // ✅ Both players are here – now start the countdown if not already started
+    if (!isActive && countdown === 3) {
+      setCountdown(3); // triggers countdown effect
+    }
+
+    // Sync opponent’s text
+    if (players[opponent]) {
+      setOpponentText(players[opponent].typedText);
+      if (players[opponent].finished && !winner) {
+        setWinner(`${opponent} Wins 🥇`);
+      }
+    }
+
+    if (players[playerName]?.finished && !winner) {
+      setWinner(`${playerName} Wins 🏆`);
+    }
+  });
+
+  return () => unsub();
+}, [roomId, playerName, winner]);
+
+
+  // 🧠 Stats calculator
   const calculateStats = (text, start) => {
     const now = Date.now();
     const minutes = (now - start) / 60000;
@@ -39,37 +85,33 @@ export default function BattleScreen() {
     return { wpm, accuracy };
   };
 
-  const handleTyping = (player, text) => {
+  // 🎯 Handle typing
+  const handleTyping = async (text) => {
     if (!isActive || winner) return;
 
-    if (player === 'p1') {
-      if (!p1Start && text.length === 1) setP1Start(Date.now());
-      setP1Text(text);
-      if (text.trim() === prompt) {
-        const statsP1 = calculateStats(text, p1Start);
-        setStats((prev) => ({ ...prev, p1: statsP1 }));
-        setWinner('Player 1 Wins 🏆');
-      }
-    } else {
-      if (!p2Start && text.length === 1) setP2Start(Date.now());
-      setP2Text(text);
-      if (text.trim() === prompt) {
-        const statsP2 = calculateStats(text, p2Start);
-        setStats((prev) => ({ ...prev, p2: statsP2 }));
-        setWinner('Player 2 Wins 🥇');
-      }
+    if (!startTime && text.length === 1) {
+      setStartTime(Date.now());
     }
+
+    setPlayerText(text);
+
+    const isFinished = text.trim() === prompt;
+    const newStats = isFinished ? calculateStats(text, startTime) : stats;
+
+    if (isFinished) {
+      setStats(newStats);
+      setWinner(`${playerName} Wins 🏆`);
+    }
+
+    await updatePlayerData(roomId, playerName, {
+      typedText: text,
+      finished: isFinished,
+      ...newStats,
+    });
   };
 
   const handleReset = () => {
-    setP1Text('');
-    setP2Text('');
-    setP1Start(null);
-    setP2Start(null);
-    setCountdown(3);
-    setIsActive(false);
-    setWinner('');
-    setStats({ p1: {}, p2: {} });
+    Alert.alert("Reset", "Restarting is only available from the Lobby for now.");
   };
 
   return (
@@ -81,37 +123,36 @@ export default function BattleScreen() {
           <Text style={styles.prompt}>{prompt}</Text>
 
           <View style={styles.playerBlock}>
-            <Text style={styles.label}>Player 1</Text>
+            <Text style={styles.label}>{playerName}</Text>
             <TextInput
               style={styles.input}
-              value={p1Text}
-              onChangeText={(text) => handleTyping('p1', text)}
-              editable={!winner}
-              placeholder="Start typing..."
+              value={playerText}
+              onChangeText={handleTyping}
+              editable={bothPlayersReady && isActive && !winner} // 👈 Only type when ready
+              placeholder={bothPlayersReady ? "Start typing..." : "Waiting for opponent..."}
+              selectTextOnFocus={bothPlayersReady}
             />
-            {stats.p1.wpm && (
-              <Text style={styles.stats}>WPM: {stats.p1.wpm}, Accuracy: {stats.p1.accuracy}%</Text>
-            )}
+
+            {stats.wpm ? (
+              <Text style={styles.stats}>
+                WPM: {stats.wpm}, Accuracy: {stats.accuracy}%
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.playerBlock}>
-            <Text style={styles.label}>Player 2</Text>
+            <Text style={styles.label}>{opponentName}</Text>
             <TextInput
-              style={styles.input}
-              value={p2Text}
-              onChangeText={(text) => handleTyping('p2', text)}
-              editable={!winner}
-              placeholder="Start typing..."
+              style={[styles.input, { backgroundColor: '#eee' }]}
+              value={opponentText}
+              editable={false}
             />
-            {stats.p2.wpm && (
-              <Text style={styles.stats}>WPM: {stats.p2.wpm}, Accuracy: {stats.p2.accuracy}%</Text>
-            )}
           </View>
 
           {winner ? (
             <>
               <Text style={styles.winnerText}>{winner}</Text>
-              <Button title="Battle Again" onPress={handleReset} />
+              <Button title="Return to Lobby" onPress={() => Alert.alert("Not implemented yet")} />
             </>
           ) : null}
         </>

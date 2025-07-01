@@ -12,7 +12,7 @@ export default function MultiplayerLobbyScreen({ navigation }) {
     try {
       const newRoomId = await createBattleRoom(playerName);
       Alert.alert('Room created!', `Room Code: ${newRoomId}`);
-      navigation.navigate('Battle', { roomId: newRoomId, playerName });
+      navigation.navigate('BattleScreen', { roomId: newRoomId, playerName });
     } catch (e) {
       Alert.alert('Error', e.message);
     }
@@ -23,7 +23,7 @@ export default function MultiplayerLobbyScreen({ navigation }) {
 
     try {
       await joinBattleRoom(roomId.toUpperCase(), playerName);
-      navigation.navigate('Battle', { roomId: roomId.toUpperCase(), playerName });
+      navigation.navigate('BattleScreen', { roomId: roomId.toUpperCase(), playerName });
     } catch (e) {
       Alert.alert('Error', e.message);
     }
