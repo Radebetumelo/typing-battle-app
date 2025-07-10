@@ -7,6 +7,12 @@ import CreateRoomScreen from '../screens/CreateRoomScreen';
 import JoinRoomScreen from '../screens/JoinRoomScreen';
 import TypingReelScreen from '../screens/TypingReelScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import LiveScreen from '../screens/LiveScreen';
+import AddScreen from '../screens/AddScreen';
+
+
+
+
 
 const Tab = createBottomTabNavigator();
 
@@ -19,7 +25,7 @@ export default function MainTabs() {
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'Create') iconName = 'game-controller';
           else if (route.name === 'Join') iconName = 'person-add';
-          else if (route.name === 'Reels') iconName = 'videocam';
+          else if (route.name === 'Add') iconName = 'videocam';
           else if (route.name === 'Profile') iconName = 'person-circle';
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -31,10 +37,12 @@ export default function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Create" component={CreateRoomScreen} />
-      <Tab.Screen name="Reels" component={TypingReelScreen} />
+      <Tab.Screen name="Add" component={AddScreen} />
+
       <Tab.Screen name="Join" component={JoinRoomScreen} />
       
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      
     </Tab.Navigator>
   );
 }

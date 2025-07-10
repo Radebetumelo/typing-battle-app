@@ -71,11 +71,13 @@ export default function TypingReelScreen() {
           handleKeyPress(last);
         }}
       />
-
+      <View style={styles.score}>
+        <Text style={{ textAlign: "center", fontSize: 24, fontWeight: 'bold' }}>{score}</Text>
+      </View>
       <View style={styles.statsBox}>
         <Text style={styles.stat}>⚡ WPM: {wpm}</Text>
         <Text style={styles.stat}>🎯 Accuracy: {accuracy}%</Text>
-        <Text style={styles.stat}>🏅 Score: {score}</Text>
+        
         <Text style={styles.stat}>⏪ Last: {lastWPM} WPM</Text>
         <Text style={styles.stat}>🌟 Top: {topSpeed} WPM</Text>
       </View>
@@ -124,6 +126,20 @@ const styles = StyleSheet.create({
   statsBox: {
     alignItems: 'center',
     marginBottom: 10,
+  },
+  score: {
+    position: 'absolute',
+    top: 60,
+    left: '50%',
+    borderBlockColor: '#2196F3',
+    borderWidth: 2,
+    borderRadius: 10,
+    minWidth: 10,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    padding: 10,
+    borderRadius: 5,
   },
   stat: {
     fontSize: 16,
