@@ -1,160 +1,173 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
 
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../backend/firebase/firebaseConfig';
+const prompt = 'Typing reels are the future of focus and flow!';
 
-const writeTestData = async () => {
-  try {
-    await addDoc(collection(db, 'testCollection'), {
-      test: '🔥 Hello Firebase!',
-      timestamp: Date.now()
-    });
-    console.log('Test data sent!');
-  } catch (e) {
-    console.error('Firebase write error:', e);
-  }
-};
-
-
-const prompt = "The quick brown fox jumps over the lazy dog";
-
-const KEY_ROWS = [
-  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+const KEYBOARD_LAYOUT = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['Z','X','C','V','B','N','M']
 ];
 
 export default function TypingReelScreen() {
   const [typed, setTyped] = useState('');
   const [startTime, setStartTime] = useState(null);
-  const [wpm, setWpm] = useState(0);
+  const [wpm, setWPM] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
-  const [countdown, setCountdown] = useState(3);
-  const [isActive, setIsActive] = useState(false);
-  const [lastKey, setLastKey] = useState('');
+  const [score, setScore] = useState(0);
+  const [topSpeed, setTopSpeed] = useState(0);
+  const [lastWPM, setLastWPM] = useState(0);
+  const [activeKey, setActiveKey] = useState(null);
 
   useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setIsActive(true);
-      setStartTime(Date.now());
+    if (typed.length === prompt.length) {
+      setLastWPM(wpm);
+      if (wpm > topSpeed) setTopSpeed(wpm);
     }
-  }, [countdown]);
+  }, [typed]);
 
-  useEffect(() => {
-    if (!isActive || typed.length === 0) return;
+  const handleKeyPress = (char) => {
+    const key = char.toUpperCase();
+    if (typed.length >= prompt.length) return;
 
+    if (!startTime) setStartTime(Date.now());
+
+    const nextChar = prompt[typed.length];
+    if (key === nextChar.toUpperCase()) {
+      setTyped((prev) => prev + key);
+    }
+
+    setActiveKey(key);
+    setTimeout(() => setActiveKey(null), 150);
+
+    // Recalculate stats
     const now = Date.now();
     const minutes = (now - startTime) / 60000;
     const words = typed.trim().split(/\s+/).length;
-    const calculatedWpm = Math.round(words / minutes);
-    setWpm(isNaN(calculatedWpm) ? 0 : calculatedWpm);
+    if (minutes > 0) {
+      const currentWPM = Math.round(words / minutes);
+      setWPM(currentWPM);
 
-    
-    const promptWords = prompt.trim().split(/\s+/);
-    const typedWords = typed.trim().split(/\s+/);
-    let correct = 0;
+      const correct = typed
+        .split('')
+        .filter((c, i) => c === prompt[i])
+        .length;
+      const currentAccuracy = Math.round((correct / prompt.length) * 100);
+      setAccuracy(currentAccuracy);
 
-    for (let i = 0; i < typedWords.length; i++) {
-      if (typedWords[i] === promptWords[i]) correct++;
-    }
-
-    const calculatedAccuracy = Math.round((correct / promptWords.length) * 100);
-    setAccuracy(isNaN(calculatedAccuracy) ? 0 : calculatedAccuracy);
-  }, [typed]);
-
-  const handleTyping = (text) => {
-    setTyped(text);
-    const latestChar = text.slice(-1);
-    if (latestChar) {
-      setLastKey(latestChar.toUpperCase());
-      setTimeout(() => setLastKey(''), 150); // fade out key highlight
+      const newScore = Math.round((currentWPM * currentAccuracy) / 100);
+      setScore(newScore);
     }
   };
 
- 
-
   return (
     <View style={styles.container}>
-      {countdown > 0 ? (
-        <Text style={styles.countdown}>{countdown}</Text>
-      ) : (
-        <>
-          <Text style={styles.prompt}>{prompt}</Text>
-          <TextInput
-            style={styles.input}
-            value={typed}
-            onChangeText={handleTyping}
-            editable={isActive}
-            placeholder="Start typing..."
-            autoFocus
-            multiline
-          />
-          <Text style={styles.stats}>WPM: {wpm}</Text>
-          <Text style={styles.stats}>Accuracy: {accuracy}%</Text>
+      <TextInput
+        autoFocus
+        style={styles.hiddenInput}
+        value=""
+        onChangeText={(text) => {
+          const last = text.slice(-1);
+          handleKeyPress(last);
+        }}
+      />
 
-          <View style={styles.keyboard}>
-            {KEY_ROWS.map((row, rowIndex) => (
-              <View key={rowIndex} style={styles.keyRow}>
-                {row.map((key) => (
-                  <View
-                    key={key}
-                    style={[
-                      styles.key,
-                      lastKey === key ? styles.keyPressed : null
-                    ]}
-                  >
-                    <Text style={styles.keyText}>{key}</Text>
-                  </View>
-                ))}
+      <View style={styles.statsBox}>
+        <Text style={styles.stat}>⚡ WPM: {wpm}</Text>
+        <Text style={styles.stat}>🎯 Accuracy: {accuracy}%</Text>
+        <Text style={styles.stat}>🏅 Score: {score}</Text>
+        <Text style={styles.stat}>⏪ Last: {lastWPM} WPM</Text>
+        <Text style={styles.stat}>🌟 Top: {topSpeed} WPM</Text>
+      </View>
+
+      <View style={styles.promptContainer}>
+        {prompt.split('').map((char, index) => {
+          const isCurrent = index === typed.length;
+          return (
+            <Text
+              key={index}
+              style={[
+                styles.letter,
+                isCurrent && styles.currentLetter
+              ]}
+            >
+              {char}
+            </Text>
+          );
+        })}
+      </View>
+
+      <View style={styles.keyboardContainer}>
+        {KEYBOARD_LAYOUT.map((row, rIdx) => (
+          <View key={rIdx} style={styles.keyRow}>
+            {row.map((key) => (
+              <View
+                key={key}
+                style={[
+                  styles.key,
+                  activeKey === key && styles.keyActive
+                ]}
+              >
+                <Text style={styles.keyText}>{key}</Text>
               </View>
             ))}
           </View>
-        </>
-      )}
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, justifyContent: 'center', alignItems: 'center' },
-  prompt: { fontSize: 16, marginBottom: 10, textAlign: 'center' },
-  input: {
-    borderColor: '#aaa',
-    borderWidth: 1,
-    fontSize: 18,
-    padding: 10,
-    borderRadius: 6,
-    minHeight: 60,
-    width: '100%',
-    backgroundColor: '#f9f9f9',
+  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  hiddenInput: { opacity: 0, position: 'absolute', height: 1, width: 1 },
+  statsBox: {
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  stats: { fontSize: 16, marginTop: 10 },
-  countdown: { fontSize: 48, fontWeight: 'bold' },
-
-  keyboard: { marginTop: 20 },
+  stat: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginVertical: 2,
+  },
+  promptContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  letter: {
+    fontSize: 26,
+    margin: 2,
+    fontWeight: '500',
+    color: '#222',
+  },
+  currentLetter: {
+    textDecorationLine: 'underline',
+    textDecorationColor: '#2196F3',
+    textDecorationStyle: 'solid',
+  },
+  keyboardContainer: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
   keyRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 6,
+    marginVertical: 5,
   },
   key: {
-    backgroundColor: '#ddd',
-    margin: 2,
-    padding: 10,
-    borderRadius: 4,
-    width: 30,
-    alignItems: 'center',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginHorizontal: 2,
   },
-  keyPressed: {
+  keyActive: {
     backgroundColor: '#2196F3',
   },
   keyText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#fff',
   },
 });

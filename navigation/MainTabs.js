@@ -31,8 +31,9 @@ export default function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Create" component={CreateRoomScreen} />
-      <Tab.Screen name="Join" component={JoinRoomScreen} />
       <Tab.Screen name="Reels" component={TypingReelScreen} />
+      <Tab.Screen name="Join" component={JoinRoomScreen} />
+      
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
