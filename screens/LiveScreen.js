@@ -1,75 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Camera } from 'expo-camera';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 export default function LiveScreen() {
-  const [hasPermission, setHasPermission] = useState(null);
-  const [isLive, setIsLive] = useState(false);
-  const cameraRef = useRef(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+    if (!permission) {
+      requestPermission();
+    }
+  }, [permission]);
 
-  const toggleLive = () => {
-    setIsLive((prev) => !prev);
-  };
-
-  if (hasPermission === null) {
-    return <View><Text>Requesting camera permission...</Text></View>;
-  }
-
-  if (hasPermission === false) {
-    return <View><Text>No access to camera.</Text></View>;
+  if (!permission?.granted) {
+    return <View style={styles.center}><Text>Requesting camera permission...</Text></View>;
   }
 
   return (
     <View style={styles.container}>
-      {isLive && (
-        <Camera
-          style={styles.camera}
-          type={Camera.Constants.Type.front}
-          ref={cameraRef}
-        >
-          <View style={styles.overlay}>
-            <Text style={styles.liveText}>🔴 LIVE</Text>
-            {/* Future: Add typing prompt + stats overlay */}
-          </View>
-        </Camera>
-      )}
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="front" // ← this replaces Camera.Constants.Type.front
+      />
 
-      <TouchableOpacity style={styles.button} onPress={toggleLive}>
-        <Text style={styles.buttonText}>{isLive ? 'Stop Live' : 'Go Live'}</Text>
-      </TouchableOpacity>
+      <View style={styles.overlay}>
+        <Text style={styles.text}>🔴 You are Live</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
-  camera: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#000' },
   overlay: {
     position: 'absolute',
     top: 40,
-    left: 20,
-    backgroundColor: 'rgba(255,0,0,0.2)',
-    padding: 6,
-    borderRadius: 6,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 8,
+    borderRadius: 8,
   },
-  liveText: {
-    color: 'white',
+  text: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  button: {
-    backgroundColor: '#2196F3',
-    padding: 15,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 6,
-    margin: 20,
   },
-  buttonText: { color: 'white', fontWeight: '600' },
 });
