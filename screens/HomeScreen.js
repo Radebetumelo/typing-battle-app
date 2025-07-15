@@ -1,8 +1,15 @@
 import React from 'react';
 import { View, Text, Button, StyleSheet } from 'react-native';
+import MenuButton from '../components/MenuButton';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen({ navigation }) {
   return (
+    < SafeAreaView style={{ flex: 1}}>
+    <View style={{ flex: 1 }}>
+  <MenuButton />
+  {/* rest of your screen content */}
+</View>
     <View style={styles.container}>
       <Text style={styles.title}>🏁 Typing Battle App</Text>
       <Button title="Typing Reel" onPress={() => navigation.navigate('TypingReel')} />
@@ -10,6 +17,7 @@ export default function HomeScreen({ navigation }) {
       <Button title="Profile" onPress={() => navigation.navigate('Profile')} />
        
     </View>
+    </SafeAreaView>
   );
 }
 

@@ -1,7 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  PanResponder,
+  Animated,
+} from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
 
-const prompt = 'Typing reels are the future of focus and flow!';
+
+const prompt = 'My name is Tumelo and i am a software developer. I love coding and creating new things.';
 
 const KEYBOARD_LAYOUT = [
   ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -9,15 +20,34 @@ const KEYBOARD_LAYOUT = [
   ['Z','X','C','V','B','N','M']
 ];
 
+const filters = [
+  { name: '', style: {} },
+  { name: '', style: { backgroundColor: 'rgba(255, 200, 150, 0.1)' } },
+  { name: '', style: { backgroundColor: 'rgba(100, 200, 255, 0.1)' } },
+  { name: '', style: { backgroundColor: 'rgba(200, 200, 200, 0.2)' } },
+];
+
 export default function TypingReelScreen() {
   const [typed, setTyped] = useState('');
   const [startTime, setStartTime] = useState(null);
   const [wpm, setWPM] = useState(0);
+  const [recording, setRecording] = useState(false);
   const [accuracy, setAccuracy] = useState(100);
   const [score, setScore] = useState(0);
   const [topSpeed, setTopSpeed] = useState(0);
+  const [cameraRef, setCameraRef] = useState(null);
   const [lastWPM, setLastWPM] = useState(0);
   const [activeKey, setActiveKey] = useState(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState('front');
+  const [filterIndex, setFilterIndex] = useState(0);
+  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!permission?.granted) requestPermission();
+    if (!mediaPermission?.granted) requestMediaPermission();
+  }, []);
 
   useEffect(() => {
     if (typed.length === prompt.length) {
@@ -25,6 +55,19 @@ export default function TypingReelScreen() {
       if (wpm > topSpeed) setTopSpeed(wpm);
     }
   }, [typed]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 20,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > 50 && filterIndex > 0) {
+          setFilterIndex(filterIndex - 1);
+        } else if (gesture.dx < -50 && filterIndex < filters.length - 1) {
+          setFilterIndex(filterIndex + 1);
+        }
+      },
+    })
+  ).current;
 
   const handleKeyPress = (char) => {
     const key = char.toUpperCase();
@@ -40,7 +83,6 @@ export default function TypingReelScreen() {
     setActiveKey(key);
     setTimeout(() => setActiveKey(null), 150);
 
-    // Recalculate stats
     const now = Date.now();
     const minutes = (now - startTime) / 60000;
     const words = typed.trim().split(/\s+/).length;
@@ -55,13 +97,61 @@ export default function TypingReelScreen() {
       const currentAccuracy = Math.round((correct / prompt.length) * 100);
       setAccuracy(currentAccuracy);
 
-      const newScore = Math.round((currentWPM * currentAccuracy) / 100);
+      const newScore = Math.round(currentWPM * currentAccuracy);
       setScore(newScore);
     }
   };
 
+  const startRecording = async () => {
+    if (!cameraRef || recording) return;
+
+   setRecording(true);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 60000,
+      useNativeDriver: false,
+     }).start();
+
+    try {
+      const video = await cameraRef.recordAsync();
+      if (video?.uri) {
+        await MediaLibrary.saveToLibraryAsync(video.uri);
+      }
+    } catch (err) {
+      console.warn('Recording error:', err);
+    }
+
+    setRecording(false);
+    progressAnim.setValue(0);
+  };
+
+  const stopRecording = async () => {
+    if (cameraRef && recording) {
+      cameraRef.stopRecording();
+    }
+  };
+
+  if (!permission?.granted) {
+    return <View style={styles.center}><Text>Requesting camera permission...</Text></View>;
+  }
+
   return (
-    <View style={styles.container}>
+   
+    <View style={styles.container} {...panResponder.panHandlers}>
+      
+      <CameraView style={StyleSheet.absoluteFill} facing={facing} ref={(ref) => setCameraRef(ref)}/>
+       
+      <View style={[styles.filterOverlay, filters[filterIndex].style]} />
+
+      <Text style={styles.filterLabel}>{filters[filterIndex].name}</Text>
+
+      <TouchableOpacity
+        onPress={() => setFacing(facing === 'front' ? 'back' : 'front')}
+        style={styles.toggleButton}
+      >
+        <Text style={styles.toggleText}>Flip</Text>
+      </TouchableOpacity>
+
       <TextInput
         autoFocus
         style={styles.hiddenInput}
@@ -71,15 +161,25 @@ export default function TypingReelScreen() {
           handleKeyPress(last);
         }}
       />
-      <View style={styles.score}>
-        <Text style={{ textAlign: "center", fontSize: 24, fontWeight: 'bold' }}>{score}</Text>
+
+      <View style={styles.scoreContainer}>
+        <Text style={styles.scoreLabel}>Score</Text>
+        <Text style={styles.scoreText}>{score}</Text>
       </View>
-      <View style={styles.statsBox}>
-        <Text style={styles.stat}>⚡ WPM: {wpm}</Text>
-        <Text style={styles.stat}>🎯 Accuracy: {accuracy}%</Text>
-        
-        <Text style={styles.stat}>⏪ Last: {lastWPM} WPM</Text>
-        <Text style={styles.stat}>🌟 Top: {topSpeed} WPM</Text>
+
+      <View style={styles.wpmContainer}>
+        <View style={[styles.wpmBox, styles.gradientBox]}>
+          <Text style={styles.wpmLabel}>Last WPM</Text>
+          <Text style={styles.wpmValue}>{lastWPM}</Text>
+        </View>
+        <View style={[styles.wpmBox, styles.gradientBox3]}>
+          <Text style={styles.wpmLabel}>Accuracy</Text>
+          <Text style={styles.wpmValue}>{accuracy}%</Text>
+        </View>
+        <View style={[styles.wpmBox, styles.gradientBox2]}>
+          <Text style={styles.wpmLabel}>Top WPM</Text>
+          <Text style={styles.wpmValue}>{topSpeed}</Text>
+        </View>
       </View>
 
       <View style={styles.promptContainer}>
@@ -88,10 +188,7 @@ export default function TypingReelScreen() {
           return (
             <Text
               key={index}
-              style={[
-                styles.letter,
-                isCurrent && styles.currentLetter
-              ]}
+              style={[styles.letter, isCurrent && styles.currentLetter]}
             >
               {char}
             </Text>
@@ -105,58 +202,57 @@ export default function TypingReelScreen() {
             {row.map((key) => (
               <View
                 key={key}
-                style={[
-                  styles.key,
-                  activeKey === key && styles.keyActive
-                ]}
+                style={[styles.key, activeKey === key && styles.keyActive]}
               >
                 <Text style={styles.keyText}>{key}</Text>
               </View>
             ))}
           </View>
         ))}
+        </View>
+        <View style={styles.recordContainer}>
+        <TouchableOpacity
+        style={styles.recordButton}
+        onPress={recording ? stopRecording : startRecording}
+      />
+        {recording && (
+        <Animated.View
+          style={[
+            styles.progressBar,
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
+            },
+          ]}
+        />
+      )}
       </View>
-    </View>
+       
+      </View>
+    
+   
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#000', justifyContent: 'flex-end'},
   hiddenInput: { opacity: 0, position: 'absolute', height: 1, width: 1 },
-  statsBox: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  score: {
-    position: 'absolute',
-    top: 60,
-    left: '50%',
-    borderBlockColor: '#2196F3',
-    borderWidth: 2,
-    borderRadius: 10,
-    minWidth: 10,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    padding: 10,
-    borderRadius: 5,
-  },
-  stat: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginVertical: 2,
-  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   promptContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'center',
+  marginTop: 300, // ⬅️ Push it below stats
+  paddingHorizontal: 10,
+  zIndex: 1, // ensure it's above camera but below score
+},
   letter: {
-    fontSize: 26,
+    fontSize: 20,
     margin: 2,
     fontWeight: '500',
-    color: '#222',
+    color: '#fff',
   },
   currentLetter: {
     textDecorationLine: 'underline',
@@ -165,7 +261,10 @@ const styles = StyleSheet.create({
   },
   keyboardContainer: {
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 190,
+    zIndex: 1,
   },
   keyRow: {
     flexDirection: 'row',
@@ -185,5 +284,88 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#fff',
+  },
+ scoreContainer: {
+  width: '100%', 
+  position: 'absolute',
+  top: 20,
+  alignItems: 'center',
+  padding: 10,
+  borderRadius: 12,
+  zIndex: 5, // same here
+},
+  scoreText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'linear-gradient(45deg, #f77062, #36d1dc, #8E2DE2)',
+  },
+  wpmContainer: {
+  position: 'absolute',
+  top: 90,
+  width: '100%',
+  flexDirection: 'row',
+  justifyContent: 'space-evenly',
+  zIndex: 5, // higher than prompt and keys
+},
+  wpmBox: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  wpmLabel: { fontSize: 12, color: '#fff', opacity: 0.7 },
+  wpmValue: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
+  gradientBox: { backgroundColor: '#f77062' },
+  gradientBox2: { backgroundColor: '#36d1dc' },
+  gradientBox3: { backgroundColor: '#8E2DE2' },
+  filterOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  filterLabel: {
+    position: 'absolute',
+    bottom: 90,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    color: '#fff',
+    fontWeight: 'bold',
+    zIndex: 2,
+  },
+  toggleButton: {
+    position: 'absolute',
+    top: 40,
+    right: 10,
+    backgroundColor: '#007bff',
+    padding: 8,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  toggleText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+
+  recordContainer: {
+    position: 'absolute',
+    bottom: 60,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  recordButton: {
+    backgroundColor: '#000',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: 40,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#2196F3',
+    position: 'absolute',
+    bottom: 5,
+    left: 0,
   },
 });

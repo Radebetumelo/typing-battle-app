@@ -1,11 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MenuButton from '../components/MenuButton';
+
 
 export default function ProfileScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>👤 Profile Stats Coming Soon!</Text>
-    </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+      <MenuButton />
+      <View style={styles.container}>
+        <Text style={styles.text}>👤 Profile Stats Coming Soon!</Text>
+      </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
