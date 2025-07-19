@@ -13,6 +13,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 
+
 const { ScreenRecorder } = NativeModules; // Access the native module
 
 const prompt =
@@ -121,62 +122,71 @@ export default function TypingReelScreen() {
   };
 
   const startRecording = async () => {
-    if (!ScreenRecorder) {
-      Alert.alert('ScreenRecorder not available', 'Native module is missing.');
-      return;
-    }
+  if (!ScreenRecorder) {
+    Alert.alert('ScreenRecorder not available', 'Native module is missing.');
+    return;
+  }
 
-    if (recording) return;
+  if (recording) return;
 
+  try {
     setRecording(true);
 
-    try {
-      // Start screen recording using the native module
-      await ScreenRecorder.startRecording();
+    // Attempt to start native recording
+    await ScreenRecorder.startRecording();
 
-      // Start progress bar animation
-      Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: 60000,
-        useNativeDriver: false,
-      }).start();
+    // Animate progress bar over 60 seconds
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 60000,
+      useNativeDriver: false,
+    }).start();
 
-      // Auto-stop after 60 seconds
-      recordingTimeout.current = setTimeout(() => {
-        stopRecording(true); // true means auto-stopped
-      }, 60000);
-    } catch (err) {
-      console.warn('Recording error:', err);
-      Alert.alert('Recording Failed', 'Failed to start screen recording.');
-      setRecording(false);
-      progressAnim.setValue(0);
+    // Auto-stop after 60 seconds
+    recordingTimeout.current = setTimeout(() => {
+      stopRecording(true); // auto-stop flag
+    }, 60000);
+  } catch (err) {
+    console.error('Recording error:', err);
+    Alert.alert('Recording Failed', err?.message || 'Failed to start screen recording.');
+    
+    // Cleanup state
+    setRecording(false);
+    progressAnim.setValue(0);
+    if (recordingTimeout.current) {
+      clearTimeout(recordingTimeout.current);
+      recordingTimeout.current = null;
     }
-  };
+  }
+};
 
-  const stopRecording = async () => {
-    if (!ScreenRecorder) {
-      Alert.alert('ScreenRecorder not available', 'Native module is missing.');
-      return;
-    }
+const stopRecording = async (auto = false) => {
+  if (!ScreenRecorder) {
+    Alert.alert('ScreenRecorder not available', 'Native module is missing.');
+    return;
+  }
 
-    if (!recording) return;
+  if (!recording) return;
 
-    try {
-      // Stop screen recording using the native module
-      await ScreenRecorder.stopRecording();
+  try {
+    await ScreenRecorder.stopRecording();
+    if (!auto) {
       Alert.alert('Saved!', 'Video saved to your gallery.');
-    } catch (err) {
-      console.warn('Stop recording error:', err);
-      Alert.alert('Stop Recording Failed', 'Failed to stop screen recording.');
-    } finally {
-      setRecording(false);
-      progressAnim.setValue(0);
-      if (recordingTimeout.current) {
-        clearTimeout(recordingTimeout.current);
-        recordingTimeout.current = null;
-      }
     }
-  };
+  } catch (err) {
+    console.error('Stop recording error:', err);
+    Alert.alert('Stop Recording Failed', err?.message || 'Failed to stop screen recording.');
+  } finally {
+    setRecording(false);
+    progressAnim.setValue(0);
+
+    if (recordingTimeout.current) {
+      clearTimeout(recordingTimeout.current);
+      recordingTimeout.current = null;
+    }
+  }
+};
+
 
   if (!permission?.granted) {
     return (
